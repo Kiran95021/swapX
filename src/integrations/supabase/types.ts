@@ -14,6 +14,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      chats: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          id: string
+          item_id: string
+          last_message_at: string | null
+          seller_id: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          last_message_at?: string | null
+          seller_id: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          last_message_at?: string | null
+          seller_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chats_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chats_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chats_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      favorites: {
+        Row: {
+          created_at: string
+          id: string
+          item_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items: {
         Row: {
           category: string
@@ -21,7 +106,9 @@ export type Database = {
           description: string | null
           id: string
           image_url: string | null
+          max_rental_days: number | null
           price: number | null
+          rental_price_per_day: number | null
           seller_id: string
           status: string
           title: string
@@ -34,7 +121,9 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          max_rental_days?: number | null
           price?: number | null
+          rental_price_per_day?: number | null
           seller_id: string
           status?: string
           title: string
@@ -47,7 +136,9 @@ export type Database = {
           description?: string | null
           id?: string
           image_url?: string | null
+          max_rental_days?: number | null
           price?: number | null
+          rental_price_per_day?: number | null
           seller_id?: string
           status?: string
           title?: string
@@ -66,6 +157,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          chat_id: string | null
           content: string
           created_at: string
           id: string
@@ -74,6 +166,7 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          chat_id?: string | null
           content: string
           created_at?: string
           id?: string
@@ -82,6 +175,7 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          chat_id?: string | null
           content?: string
           created_at?: string
           id?: string
@@ -90,6 +184,13 @@ export type Database = {
           sender_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_chat_id_fkey"
+            columns: ["chat_id"]
+            isOneToOne: false
+            referencedRelation: "chats"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_item_id_fkey"
             columns: ["item_id"]
@@ -116,29 +217,128 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
           created_at: string
           email: string
           id: string
+          phone_number: string | null
           university_name: string | null
           updated_at: string
+          year_of_study: string | null
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           email: string
           id: string
+          phone_number?: string | null
           university_name?: string | null
           updated_at?: string
+          year_of_study?: string | null
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           email?: string
           id?: string
+          phone_number?: string | null
           university_name?: string | null
           updated_at?: string
+          year_of_study?: string | null
         }
         Relationships: []
+      }
+      rentals: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          item_id: string
+          owner_id: string
+          renter_id: string
+          start_date: string
+          status: string
+          total_price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          item_id: string
+          owner_id: string
+          renter_id: string
+          start_date: string
+          status?: string
+          total_price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          item_id?: string
+          owner_id?: string
+          renter_id?: string
+          start_date?: string
+          status?: string
+          total_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentals_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentals_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rentals_renter_id_fkey"
+            columns: ["renter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wishlists: {
+        Row: {
+          created_at: string
+          id: string
+          keyword: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          keyword: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          keyword?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wishlists_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

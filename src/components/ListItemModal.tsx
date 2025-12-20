@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, ArrowRight, ArrowLeft, Check, DollarSign, Repeat, Gift } from "lucide-react";
+import { X, Upload, ArrowRight, ArrowLeft, Check, DollarSign, Repeat, Gift, Clock } from "lucide-react";
 import { MotionButton } from "./ui/motion-button";
 import { cn } from "@/lib/utils";
 
@@ -14,9 +14,12 @@ interface ItemData {
   title: string;
   description: string;
   price: number | null;
-  type: 'sell' | 'swap' | 'free';
+  type: 'sell' | 'swap' | 'free' | 'rent';
   category: string;
   imageUrl: string;
+  imageFile?: File;
+  rental_price_per_day: number | null;
+  max_rental_days: number | null;
 }
 
 const categories = ['Textbooks', 'Electronics', 'Furniture', 'Clothing', 'Sports', 'Other'];
@@ -25,11 +28,13 @@ const typeOptions = [
   { value: 'sell', icon: DollarSign, label: 'Sell', description: 'Set a price for your item' },
   { value: 'swap', icon: Repeat, label: 'Swap', description: 'Trade for something you need' },
   { value: 'free', icon: Gift, label: 'Free', description: 'Give it away to a fellow student' },
+  { value: 'rent', icon: Clock, label: 'Rent', description: 'Rent out for daily fees (Exam time!)' },
 ];
 
 export function ListItemModal({ isOpen, onClose, onSubmit }: ListItemModalProps) {
   const [step, setStep] = useState(1);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [formData, setFormData] = useState<ItemData>({
     title: '',
     description: '',
@@ -37,11 +42,14 @@ export function ListItemModal({ isOpen, onClose, onSubmit }: ListItemModalProps)
     type: 'sell',
     category: 'Other',
     imageUrl: '',
+    rental_price_per_day: null,
+    max_rental_days: 30,
   });
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -52,13 +60,14 @@ export function ListItemModal({ isOpen, onClose, onSubmit }: ListItemModalProps)
   };
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    onSubmit({ ...formData, imageFile: imageFile || undefined });
     handleClose();
   };
 
   const handleClose = () => {
     setStep(1);
     setImagePreview(null);
+    setImageFile(null);
     setFormData({
       title: '',
       description: '',
@@ -66,6 +75,8 @@ export function ListItemModal({ isOpen, onClose, onSubmit }: ListItemModalProps)
       type: 'sell',
       category: 'Other',
       imageUrl: '',
+      rental_price_per_day: null,
+      max_rental_days: 30,
     });
     onClose();
   };
@@ -274,15 +285,48 @@ export function ListItemModal({ isOpen, onClose, onSubmit }: ListItemModalProps)
                         animate={{ opacity: 1, height: 'auto' }}
                         className="pt-2"
                       >
-                        <label className="text-sm font-medium text-foreground">Price</label>
+                        <label className="text-sm font-medium text-foreground">Price (₹)</label>
                         <div className="relative mt-1">
-                          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
                           <input
                             type="number"
                             value={formData.price || ''}
                             onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || null })}
-                            placeholder="0.00"
-                            className="w-full pl-12 pr-4 py-3 rounded-xl bg-secondary text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="0"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {formData.type === 'rent' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="pt-2 space-y-4"
+                      >
+                        <div>
+                          <label className="text-sm font-medium text-foreground">Daily Rental Price (₹)</label>
+                          <div className="relative mt-1">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
+                            <input
+                              type="number"
+                              value={formData.rental_price_per_day || ''}
+                              onChange={(e) => setFormData({ ...formData, rental_price_per_day: parseFloat(e.target.value) || null })}
+                              placeholder="0"
+                              className="w-full pl-10 pr-16 py-3 rounded-xl bg-secondary text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">/day</span>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-foreground">Max Rental Days</label>
+                          <input
+                            type="number"
+                            value={formData.max_rental_days || ''}
+                            onChange={(e) => setFormData({ ...formData, max_rental_days: parseInt(e.target.value) || null })}
+                            placeholder="30"
+                            className="mt-1 w-full px-4 py-3 rounded-xl bg-secondary text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                           />
                         </div>
                       </motion.div>
