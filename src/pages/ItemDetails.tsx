@@ -1,58 +1,174 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft, Heart, Share2, Shield, MessageCircle, DollarSign, Repeat, Gift } from "lucide-react";
+import { ArrowLeft, Heart, Share2, Shield, MessageCircle, DollarSign, Repeat, Gift, Clock, Calendar } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MotionButton } from "@/components/ui/motion-button";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { supabase } from "@/integrations/supabase/client";
+import { useFavorites } from "@/hooks/useFavorites";
+import { getOrCreateChat } from "@/hooks/useChats";
+import { createRentalRequest } from "@/hooks/useRentals";
+import { formatPrice, formatPricePerDay } from "@/lib/currency";
+import { toast } from "sonner";
+import { format, addDays } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
-// Dummy data - in real app this would come from Supabase
-const dummyItems: Record<string, any> = {
-  '1': {
-    id: '1',
-    title: 'Calculus Textbook (8th Ed)',
-    description: 'Barely used calculus textbook. Some highlighting in first 3 chapters but otherwise pristine. Great for MATH 201.',
-    price: 45,
-    type: 'sell',
-    imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80',
-    seller: {
-      name: 'Alex Chen',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80',
-      university: 'Stanford University',
-    },
-    createdAt: '2 days ago',
-  },
-  '2': {
-    id: '2',
-    title: 'MacBook Pro Charger',
-    description: 'Original Apple 61W USB-C charger. Works perfectly, selling because I upgraded to a different laptop.',
-    price: 25,
-    type: 'sell',
-    imageUrl: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=800&q=80',
-    seller: {
-      name: 'Maya Patel',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80',
-      university: 'MIT',
-    },
-    createdAt: '5 hours ago',
-  },
-};
+interface ItemData {
+  id: string;
+  title: string;
+  description: string | null;
+  price: number | null;
+  type: string;
+  image_url: string | null;
+  rental_price_per_day: number | null;
+  max_rental_days: number | null;
+  created_at: string;
+  seller_id: string;
+  seller?: {
+    id: string;
+    email: string;
+    avatar_url: string | null;
+    university_name: string | null;
+  };
+}
 
 const typeConfig = {
   sell: { icon: DollarSign, label: 'For Sale', color: 'bg-primary text-primary-foreground' },
   swap: { icon: Repeat, label: 'Swap', color: 'bg-accent text-accent-foreground' },
   free: { icon: Gift, label: 'Free', color: 'bg-success text-success-foreground' },
+  rent: { icon: Clock, label: 'For Rent', color: 'bg-warning text-warning-foreground' },
 };
 
 export default function ItemDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [item, setItem] = useState<ItemData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [messageLoading, setMessageLoading] = useState(false);
+  const [rentalLoading, setRentalLoading] = useState(false);
+  const { toggleFavorite, isFavorited } = useFavorites();
+  
+  // Rental date state
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
+  const [showRentalForm, setShowRentalForm] = useState(false);
 
-  // Get item data (fallback to first item for demo)
-  const item = dummyItems[id || '1'] || dummyItems['1'];
-  const config = typeConfig[item.type as keyof typeof typeConfig];
+  useEffect(() => {
+    const fetchItem = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("items")
+          .select(`
+            *,
+            seller:profiles!items_seller_id_fkey (
+              id,
+              email,
+              avatar_url,
+              university_name
+            )
+          `)
+          .eq("id", id)
+          .maybeSingle();
+
+        if (error) throw error;
+        setItem(data as ItemData);
+      } catch (error) {
+        console.error("Error fetching item:", error);
+        toast.error("Failed to load item");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchItem();
+  }, [id]);
+
+  const handleMessage = async () => {
+    if (!item || !item.seller) return;
+    
+    try {
+      setMessageLoading(true);
+      const chatId = await getOrCreateChat(item.id, item.seller_id);
+      navigate(`/chat/${chatId}`);
+    } catch (error: any) {
+      console.error("Error creating chat:", error);
+      toast.error("Failed to start conversation");
+    } finally {
+      setMessageLoading(false);
+    }
+  };
+
+  const handleRentalRequest = async () => {
+    if (!item || !startDate || !endDate) {
+      toast.error("Please select rental dates");
+      return;
+    }
+
+    if (!item.rental_price_per_day) {
+      toast.error("Rental price not set");
+      return;
+    }
+
+    try {
+      setRentalLoading(true);
+      await createRentalRequest(
+        item.id,
+        item.seller_id,
+        startDate,
+        endDate,
+        item.rental_price_per_day
+      );
+      toast.success("Rental request sent! The owner will be notified.");
+      setShowRentalForm(false);
+      setStartDate(undefined);
+      setEndDate(undefined);
+    } catch (error: any) {
+      console.error("Error creating rental request:", error);
+      toast.error("Failed to send rental request");
+    } finally {
+      setRentalLoading(false);
+    }
+  };
+
+  const handleFavoriteClick = () => {
+    if (item) {
+      toggleFavorite(item.id);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (!item) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <p className="text-xl text-muted-foreground">Item not found</p>
+        <MotionButton variant="primary" onClick={() => navigate(-1)}>Go Back</MotionButton>
+      </div>
+    );
+  }
+
+  const config = typeConfig[item.type as keyof typeof typeConfig] || typeConfig.sell;
   const Icon = config.icon;
+  const sellerName = item.seller?.email?.split('@')[0] || 'Unknown';
+  const createdAt = new Date(item.created_at).toLocaleDateString();
+
+  const calculateRentalTotal = () => {
+    if (!startDate || !endDate || !item.rental_price_per_day) return 0;
+    const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    return days * item.rental_price_per_day;
+  };
 
   return (
     <motion.div
@@ -65,7 +181,7 @@ export default function ItemDetails() {
       {/* Hero Image */}
       <div className="relative h-[40vh] min-h-[300px]">
         <img
-          src={item.imageUrl}
+          src={item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=800&q=80'}
           alt={item.title}
           className="w-full h-full object-cover"
         />
@@ -88,10 +204,10 @@ export default function ItemDetails() {
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={() => setIsFavorite(!isFavorite)}
+              onClick={handleFavoriteClick}
               className="h-10 w-10 rounded-full glass flex items-center justify-center"
             >
-              <Heart className={cn("h-5 w-5", isFavorite ? "fill-destructive text-destructive" : "text-foreground")} />
+              <Heart className={cn("h-5 w-5", isFavorited(item.id) ? "fill-destructive text-destructive" : "text-foreground")} />
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.1 }}
@@ -122,8 +238,11 @@ export default function ItemDetails() {
         >
           {/* Price & Title */}
           <div className="mb-4">
-            {item.type === 'sell' && (
-              <span className="text-3xl font-bold text-foreground">${item.price}</span>
+            {item.type === 'sell' && item.price !== null && (
+              <span className="text-3xl font-bold text-foreground">{formatPrice(item.price)}</span>
+            )}
+            {item.type === 'rent' && item.rental_price_per_day !== null && (
+              <span className="text-3xl font-bold text-warning">{formatPricePerDay(item.rental_price_per_day)}</span>
             )}
             {item.type === 'free' && (
               <span className="text-3xl font-bold text-success">Free</span>
@@ -132,25 +251,98 @@ export default function ItemDetails() {
               <span className="text-3xl font-bold text-accent-foreground">Open to swap</span>
             )}
             <h1 className="text-2xl font-bold text-foreground mt-2">{item.title}</h1>
-            <p className="text-muted-foreground mt-1">Listed {item.createdAt}</p>
+            <p className="text-muted-foreground mt-1">Listed {createdAt}</p>
           </div>
 
           {/* Description */}
           <div className="mb-6">
             <h2 className="font-semibold text-foreground mb-2">Description</h2>
-            <p className="text-muted-foreground leading-relaxed">{item.description}</p>
+            <p className="text-muted-foreground leading-relaxed">{item.description || 'No description provided'}</p>
           </div>
+
+          {/* Rental Form */}
+          {item.type === 'rent' && (
+            <motion.div 
+              className="mb-6 p-4 rounded-2xl bg-warning/10 border border-warning/20"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-warning" />
+                Request Rental
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">Start Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        {startDate ? format(startDate, "PPP") : "Pick date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">End Date</label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        {endDate ? format(endDate, "PPP") : "Pick date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        disabled={(date) => date < (startDate || new Date())}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+
+              {startDate && endDate && (
+                <div className="mb-4 p-3 rounded-xl bg-background">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total</span>
+                    <span className="font-bold text-foreground">{formatPrice(calculateRentalTotal())}</span>
+                  </div>
+                </div>
+              )}
+
+              <MotionButton
+                variant="primary"
+                className="w-full bg-warning hover:bg-warning/90"
+                onClick={handleRentalRequest}
+                disabled={!startDate || !endDate || rentalLoading}
+              >
+                {rentalLoading ? "Sending..." : "Request Rental"}
+              </MotionButton>
+            </motion.div>
+          )}
 
           {/* Seller Info */}
           <div className="p-4 rounded-2xl bg-secondary/50 flex items-center gap-4">
-            <img
-              src={item.seller.avatar}
-              alt={item.seller.name}
-              className="h-14 w-14 rounded-full object-cover"
-            />
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary">
+              {sellerName.charAt(0).toUpperCase()}
+            </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-foreground">{item.seller.name}</h3>
-              <p className="text-sm text-muted-foreground">{item.seller.university}</p>
+              <h3 className="font-semibold text-foreground">{sellerName}</h3>
+              <p className="text-sm text-muted-foreground">{item.seller?.university_name || 'Campus Student'}</p>
             </div>
             <Tooltip>
               <TooltipTrigger>
@@ -178,10 +370,11 @@ export default function ItemDetails() {
             variant="primary"
             size="lg"
             className="w-full animate-pulse-soft"
-            onClick={() => navigate(`/chat/${item.id}`)}
+            onClick={handleMessage}
+            disabled={messageLoading}
           >
             <MessageCircle className="h-5 w-5 mr-2" />
-            Chat with {item.seller.name.split(' ')[0]}
+            {messageLoading ? "Opening chat..." : `Chat with ${sellerName}`}
           </MotionButton>
         </div>
       </motion.div>
