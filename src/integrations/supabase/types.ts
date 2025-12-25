@@ -345,7 +345,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_rental_status_secure: {
+        Args: { new_status: string; rental_uuid: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

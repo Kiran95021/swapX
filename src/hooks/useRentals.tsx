@@ -129,9 +129,10 @@ export async function createRentalRequest(
 
 export async function updateRentalStatus(rentalId: string, status: string) {
   const { error } = await supabase
-    .from("rentals")
-    .update({ status })
-    .eq("id", rentalId);
+    .rpc("update_rental_status_secure", { 
+      rental_uuid: rentalId, 
+      new_status: status 
+    });
 
   if (error) throw error;
 }

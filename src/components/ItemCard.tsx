@@ -11,8 +11,11 @@ interface ItemCardProps {
   type: 'sell' | 'swap' | 'free' | 'rent';
   imageUrl: string;
   sellerName?: string;
+  category?: string;
   onClick?: () => void;
   index?: number;
+  isFavorited?: boolean;
+  onFavoriteClick?: (e: React.MouseEvent) => void;
 }
 
 const typeConfig = {
@@ -22,7 +25,7 @@ const typeConfig = {
   rent: { icon: Clock, label: 'For Rent', color: 'bg-orange-500 text-white' },
 };
 
-export function ItemCard({ id, title, price, rentalPricePerDay, type, imageUrl, sellerName, onClick, index = 0 }: ItemCardProps) {
+export function ItemCard({ id, title, price, rentalPricePerDay, type, imageUrl, sellerName, category, onClick, index = 0, isFavorited = false, onFavoriteClick }: ItemCardProps) {
   const config = typeConfig[type];
   const Icon = config.icon;
 
@@ -63,10 +66,16 @@ export function ItemCard({ id, title, price, rentalPricePerDay, type, imageUrl, 
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
-            className="absolute top-3 right-3 h-9 w-9 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              "absolute top-3 right-3 h-9 w-9 rounded-full bg-card/80 backdrop-blur-sm flex items-center justify-center transition-opacity",
+              onFavoriteClick ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onFavoriteClick?.(e);
+            }}
           >
-            <Heart className="h-4 w-4 text-muted-foreground" />
+            <Heart className={cn("h-4 w-4", isFavorited ? "fill-red-500 text-red-500" : "text-muted-foreground")} />
           </motion.button>
         </div>
 
