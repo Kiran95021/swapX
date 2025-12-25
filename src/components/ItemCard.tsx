@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
-import { Heart, Repeat, Gift, DollarSign } from "lucide-react";
+import { Heart, Repeat, Gift, DollarSign, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/currency";
 
 interface ItemCardProps {
   id: string;
   title: string;
   price: number | null;
-  type: 'sell' | 'swap' | 'free';
+  rentalPricePerDay?: number | null;
+  type: 'sell' | 'swap' | 'free' | 'rent';
   imageUrl: string;
   sellerName?: string;
   onClick?: () => void;
@@ -17,9 +19,10 @@ const typeConfig = {
   sell: { icon: DollarSign, label: 'For Sale', color: 'bg-primary text-primary-foreground' },
   swap: { icon: Repeat, label: 'Swap', color: 'bg-accent text-accent-foreground' },
   free: { icon: Gift, label: 'Free', color: 'bg-success text-success-foreground' },
+  rent: { icon: Clock, label: 'For Rent', color: 'bg-orange-500 text-white' },
 };
 
-export function ItemCard({ id, title, price, type, imageUrl, sellerName, onClick, index = 0 }: ItemCardProps) {
+export function ItemCard({ id, title, price, rentalPricePerDay, type, imageUrl, sellerName, onClick, index = 0 }: ItemCardProps) {
   const config = typeConfig[type];
   const Icon = config.icon;
 
@@ -78,8 +81,10 @@ export function ItemCard({ id, title, price, type, imageUrl, sellerName, onClick
               <span className="text-success font-bold text-lg">Free</span>
             ) : type === 'swap' ? (
               <span className="text-accent-foreground font-semibold">Open to swap</span>
+            ) : type === 'rent' ? (
+              <span className="text-foreground font-bold text-lg">{formatPrice(rentalPricePerDay || 0)}/day</span>
             ) : (
-              <span className="text-foreground font-bold text-lg">${price?.toFixed(2)}</span>
+              <span className="text-foreground font-bold text-lg">{formatPrice(price || 0)}</span>
             )}
           </div>
         </div>
