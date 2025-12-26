@@ -164,9 +164,27 @@ export async function createItem(itemData: {
 
   let image_url = null;
 
-  // Upload image if provided
+  // Upload image if provided with validation
   if (itemData.imageFile) {
-    const fileExt = itemData.imageFile.name.split(".").pop();
+    // Validate file type (MIME type check)
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+    if (!allowedTypes.includes(itemData.imageFile.type)) {
+      throw new Error('Only image files (JPEG, PNG, WebP, GIF, HEIC) are allowed');
+    }
+
+    // Validate file size (10MB max)
+    const maxSize = 10 * 1024 * 1024;
+    if (itemData.imageFile.size > maxSize) {
+      throw new Error('Image must be smaller than 10MB');
+    }
+
+    // Validate file extension
+    const fileExt = itemData.imageFile.name.split(".").pop()?.toLowerCase();
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'];
+    if (!fileExt || !allowedExtensions.includes(fileExt)) {
+      throw new Error('Invalid file extension. Only jpg, jpeg, png, webp, gif, heic, heif are allowed');
+    }
+
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
     
     const { error: uploadError } = await supabase.storage
