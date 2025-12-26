@@ -69,7 +69,7 @@ export default function SavedItems() {
                 price={item.price}
                 type={item.type as 'sell' | 'swap' | 'free' | 'rent'}
                 imageUrl={item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&q=80'}
-                sellerName={item.seller?.email?.split('@')[0] || 'Unknown'}
+                sellerName="Seller"
                 category={item.category}
                 rentalPricePerDay={item.rental_price_per_day}
                 index={index}
