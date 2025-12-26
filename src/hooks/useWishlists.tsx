@@ -42,9 +42,25 @@ export function useWishlists() {
         return;
       }
 
+      // Validate keyword
+      const trimmedKeyword = keyword.trim().toLowerCase();
+      if (!trimmedKeyword || trimmedKeyword.length === 0) {
+        toast.error("Keyword cannot be empty");
+        return;
+      }
+      if (trimmedKeyword.length > 100) {
+        toast.error("Keyword must be less than 100 characters");
+        return;
+      }
+      // Reject obvious script/XSS patterns
+      if (/<script|javascript:|onerror=|onclick=|onload=/i.test(trimmedKeyword)) {
+        toast.error("Invalid keyword format");
+        return;
+      }
+
       const { error } = await supabase
         .from("wishlists")
-        .insert({ user_id: user.id, keyword: keyword.toLowerCase().trim() });
+        .insert({ user_id: user.id, keyword: trimmedKeyword });
 
       if (error) {
         if (error.code === "23505") {

@@ -182,11 +182,25 @@ export async function sendMessage(chatId: string, content: string, receiverId: s
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  // Validate message content
+  const trimmedContent = content.trim();
+  if (!trimmedContent || trimmedContent.length === 0) {
+    throw new Error("Message cannot be empty");
+  }
+  if (trimmedContent.length > 2000) {
+    throw new Error("Message must be less than 2000 characters");
+  }
+  
+  // Reject obvious script/XSS patterns
+  if (/<script|javascript:|onerror=|onclick=|onload=/i.test(trimmedContent)) {
+    throw new Error("Message contains prohibited content");
+  }
+
   const { error: messageError } = await supabase
     .from("messages")
     .insert({
       chat_id: chatId,
-      content,
+      content: trimmedContent,
       sender_id: user.id,
       receiver_id: receiverId,
       item_id: itemId,
