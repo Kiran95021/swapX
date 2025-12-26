@@ -199,11 +199,32 @@ export async function createItem(itemData: {
     }
   }
 
+  // Validate title
+  const trimmedTitle = itemData.title.trim();
+  if (!trimmedTitle || trimmedTitle.length === 0) {
+    throw new Error("Title cannot be empty");
+  }
+  if (trimmedTitle.length > 200) {
+    throw new Error("Title must be less than 200 characters");
+  }
+  if (/<script|javascript:|onerror=|onclick=|onload=/i.test(trimmedTitle)) {
+    throw new Error("Title contains prohibited content");
+  }
+
+  // Validate description if provided
+  const trimmedDescription = itemData.description?.trim() || null;
+  if (trimmedDescription && trimmedDescription.length > 2000) {
+    throw new Error("Description must be less than 2000 characters");
+  }
+  if (trimmedDescription && /<script|javascript:|onerror=|onclick=|onload=/i.test(trimmedDescription)) {
+    throw new Error("Description contains prohibited content");
+  }
+
   const { data, error } = await supabase
     .from("items")
     .insert({
-      title: itemData.title,
-      description: itemData.description,
+      title: trimmedTitle,
+      description: trimmedDescription,
       price: itemData.price,
       type: itemData.type,
       category: itemData.category,
