@@ -18,8 +18,9 @@ export default function Auth() {
   const { toast } = useToast();
 
   const validateCampusEmail = (email: string) => {
-    const lowerEmail = email.toLowerCase();
-    return lowerEmail.includes('.edu') || lowerEmail.includes('.ac.in') || lowerEmail.includes('.ac.uk');
+    // Strict regex: domain must end with .edu, .ac.in, or .ac.uk
+    const campusEmailRegex = /@[a-z0-9.-]+\.(edu|ac\.in|ac\.uk)$/i;
+    return campusEmailRegex.test(email.trim());
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
