@@ -18,9 +18,7 @@ export interface Item {
   updated_at: string;
   seller?: {
     id: string;
-    email: string;
     avatar_url: string | null;
-    university_name: string | null;
   };
 }
 
@@ -37,9 +35,7 @@ export function useItems() {
           *,
           seller:profiles!items_seller_id_fkey (
             id,
-            email,
-            avatar_url,
-            university_name
+            avatar_url
           )
         `)
         .eq("status", "active")
@@ -128,9 +124,7 @@ export function useSavedItems() {
             *,
             seller:profiles!items_seller_id_fkey (
               id,
-              email,
-              avatar_url,
-              university_name
+              avatar_url
             )
           )
         `)

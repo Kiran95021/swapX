@@ -29,9 +29,7 @@ interface ItemData {
   seller_id: string;
   seller?: {
     id: string;
-    email: string;
     avatar_url: string | null;
-    university_name: string | null;
   };
 }
 
@@ -68,9 +66,7 @@ export default function ItemDetails() {
             *,
             seller:profiles!items_seller_id_fkey (
               id,
-              email,
-              avatar_url,
-              university_name
+              avatar_url
             )
           `)
           .eq("id", id)
@@ -161,7 +157,7 @@ export default function ItemDetails() {
 
   const config = typeConfig[item.type as keyof typeof typeConfig] || typeConfig.sell;
   const Icon = config.icon;
-  const sellerName = item.seller?.email?.split('@')[0] || 'Unknown';
+  const sellerName = 'Seller';
   const createdAt = new Date(item.created_at).toLocaleDateString();
 
   const calculateRentalTotal = () => {
@@ -342,7 +338,7 @@ export default function ItemDetails() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-foreground">{sellerName}</h3>
-              <p className="text-sm text-muted-foreground">{item.seller?.university_name || 'Campus Student'}</p>
+              <p className="text-sm text-muted-foreground">Campus Student</p>
             </div>
             <Tooltip>
               <TooltipTrigger>
