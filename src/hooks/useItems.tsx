@@ -239,3 +239,33 @@ export async function createItem(itemData: {
   if (error) throw error;
   return data;
 }
+
+export async function deleteItem(itemId: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // First, delete the image from storage if it exists
+  const { data: item } = await supabase
+    .from("items")
+    .select("image_url")
+    .eq("id", itemId)
+    .eq("seller_id", user.id)
+    .maybeSingle();
+
+  if (item?.image_url) {
+    // Extract file path from URL
+    const urlParts = item.image_url.split("/item-images/");
+    if (urlParts[1]) {
+      await supabase.storage.from("item-images").remove([urlParts[1]]);
+    }
+  }
+
+  // Delete the item
+  const { error } = await supabase
+    .from("items")
+    .delete()
+    .eq("id", itemId)
+    .eq("seller_id", user.id);
+
+  if (error) throw error;
+}
