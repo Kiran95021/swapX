@@ -61,7 +61,8 @@ export function useRentals() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const channel = supabase
+      // Channel for new rental requests (as owner)
+      const newRentalsChannel = supabase
         .channel("rental-notifications")
         .on(
           "postgres_changes",
@@ -72,7 +73,6 @@ export function useRentals() {
             filter: `owner_id=eq.${user.id}`
           },
           (payload) => {
-            const rental = payload.new as Rental;
             toast.info("New rental request received!", {
               description: "Someone wants to rent your item",
               action: {
@@ -86,12 +86,43 @@ export function useRentals() {
         )
         .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+      // Channel for all rental updates (as owner or renter)
+      const rentalUpdatesChannel = supabase
+        .channel("rental-updates")
+        .on(
+          "postgres_changes",
+          { 
+            event: "UPDATE", 
+            schema: "public", 
+            table: "rentals"
+          },
+          (payload) => {
+            const rental = payload.new as Rental;
+            // Only notify if user is involved
+            if (rental.owner_id === user.id || rental.renter_id === user.id) {
+              if (rental.status === 'approved' && rental.renter_id === user.id) {
+                toast.success("Your rental request was approved!");
+              } else if (rental.status === 'rejected' && rental.renter_id === user.id) {
+                toast.error("Your rental request was rejected");
+              }
+              fetchRentals();
+            }
+          }
+        )
+        .subscribe();
+
+      return { newRentalsChannel, rentalUpdatesChannel };
     };
 
-    setupRealtimeNotifications();
+    let channels: { newRentalsChannel?: ReturnType<typeof supabase.channel>; rentalUpdatesChannel?: ReturnType<typeof supabase.channel> } = {};
+    setupRealtimeNotifications().then(ch => { 
+      if (ch) channels = ch; 
+    });
+
+    return () => {
+      if (channels.newRentalsChannel) supabase.removeChannel(channels.newRentalsChannel);
+      if (channels.rentalUpdatesChannel) supabase.removeChannel(channels.rentalUpdatesChannel);
+    };
   }, [fetchRentals]);
 
   return { rentals, loading, refetch: fetchRentals };
