@@ -79,7 +79,37 @@ export function useFavorites() {
       fetchFavorites();
     });
 
-    return () => subscription.unsubscribe();
+    // Subscribe to realtime updates for favorites
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase
+        .channel("favorites-changes")
+        .on(
+          "postgres_changes",
+          { 
+            event: "*", 
+            schema: "public", 
+            table: "favorites",
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            fetchFavorites();
+          }
+        )
+        .subscribe();
+
+      return channel;
+    };
+
+    let channel: ReturnType<typeof supabase.channel> | undefined;
+    setupRealtime().then(ch => { channel = ch; });
+
+    return () => {
+      subscription.unsubscribe();
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [fetchFavorites]);
 
   return { favoriteIds, toggleFavorite, loading, isFavorited: (id: string) => favoriteIds.has(id) };

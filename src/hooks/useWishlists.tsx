@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -97,6 +97,37 @@ export function useWishlists() {
 
   useEffect(() => {
     fetchWishlists();
+
+    // Subscribe to realtime updates for wishlists
+    const setupRealtime = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase
+        .channel("wishlists-changes")
+        .on(
+          "postgres_changes",
+          { 
+            event: "*", 
+            schema: "public", 
+            table: "wishlists",
+            filter: `user_id=eq.${user.id}`
+          },
+          () => {
+            fetchWishlists();
+          }
+        )
+        .subscribe();
+
+      return channel;
+    };
+
+    let channel: ReturnType<typeof supabase.channel> | undefined;
+    setupRealtime().then(ch => { channel = ch; });
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [fetchWishlists]);
 
   return { wishlists, loading, addKeyword, removeKeyword, refetch: fetchWishlists };
@@ -105,6 +136,12 @@ export function useWishlists() {
 // Hook to listen for new items matching wishlist keywords
 export function useWishlistAlerts() {
   const [wishlists, setWishlists] = useState<Wishlist[]>([]);
+  const wishlistsRef = useRef<Wishlist[]>([]);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    wishlistsRef.current = wishlists;
+  }, [wishlists]);
 
   useEffect(() => {
     const fetchUserWishlists = async () => {
@@ -131,8 +168,8 @@ export function useWishlistAlerts() {
           const newItem = payload.new as { title: string; id: string };
           const title = newItem.title.toLowerCase();
           
-          // Check if any wishlist keyword matches
-          for (const wishlist of wishlists) {
+          // Use ref to get current wishlists
+          for (const wishlist of wishlistsRef.current) {
             if (title.includes(wishlist.keyword.toLowerCase())) {
               toast.success(`New item matches your wishlist: "${newItem.title}"`, {
                 action: {
@@ -148,8 +185,21 @@ export function useWishlistAlerts() {
       )
       .subscribe();
 
+    // Subscribe to wishlist changes to keep alerts in sync
+    const wishlistChannel = supabase
+      .channel("wishlist-updates-for-alerts")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wishlists" },
+        () => {
+          fetchUserWishlists();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(wishlistChannel);
     };
-  }, [wishlists]);
+  }, []);
 }
