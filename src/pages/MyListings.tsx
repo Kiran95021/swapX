@@ -4,7 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { BottomNav } from "@/components/BottomNav";
 import { ItemCard } from "@/components/ItemCard";
-import { useMyItems, deleteItem } from "@/hooks/useItems";
+import { useMyItems, deleteItem, createItem } from "@/hooks/useItems";
+import { FloatingActionButton } from "@/components/FloatingActionButton";
+import { ListItemModal } from "@/components/ListItemModal";
 import { useFavorites } from "@/hooks/useFavorites";
 import { toast } from "sonner";
 import {
@@ -31,6 +33,17 @@ export default function MyListings() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string; title: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isListModalOpen, setIsListModalOpen] = useState(false);
+
+  const handleListItem = async (itemData: any) => {
+    try {
+      await createItem(itemData);
+      setIsListModalOpen(false);
+    } catch (error: any) {
+      console.error("Error creating item:", error);
+      throw error;
+    }
+  };
 
   const handleItemClick = (id: string) => {
     navigate(`/item/${id}`);
@@ -195,6 +208,12 @@ export default function MyListings() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <FloatingActionButton onClick={() => setIsListModalOpen(true)} />
+      <ListItemModal
+        isOpen={isListModalOpen}
+        onClose={() => setIsListModalOpen(false)}
+        onSubmit={handleListItem}
+      />
       <BottomNav />
     </div>
   );
