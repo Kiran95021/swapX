@@ -102,6 +102,34 @@ export function useMyItems() {
 
   useEffect(() => {
     fetchMyItems();
+
+    // Subscribe to realtime updates for user's own items
+    const setupRealtimeSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const channel = supabase
+        .channel("my-items-changes")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "items", filter: `seller_id=eq.${user.id}` },
+          () => {
+            fetchMyItems();
+          }
+        )
+        .subscribe();
+
+      return channel;
+    };
+
+    let channel: ReturnType<typeof supabase.channel> | undefined;
+    setupRealtimeSubscription().then(ch => { channel = ch; });
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, [fetchMyItems]);
 
   return { items, loading, refetch: fetchMyItems };
