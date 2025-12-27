@@ -14,7 +14,7 @@ export function FloatingActionButton({ onClick }: FloatingActionButtonProps) {
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
-      className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full gradient-primary shadow-glow flex items-center justify-center text-primary-foreground"
+      className="fixed bottom-24 right-6 z-50 h-14 w-14 rounded-full gradient-primary shadow-glow flex items-center justify-center text-primary-foreground"
     >
       <Plus className="h-6 w-6" />
     </motion.button>
