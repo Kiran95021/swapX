@@ -84,6 +84,10 @@ export function ListItemModal({ isOpen, onClose, onSubmit }: ListItemModalProps)
   const canProceed = () => {
     if (step === 1) return !!imagePreview;
     if (step === 2) return !!formData.title.trim();
+    if (step === 3) {
+      if (formData.type === 'sell') return formData.price !== null && formData.price > 0;
+      if (formData.type === 'rent') return formData.rental_price_per_day !== null && formData.rental_price_per_day > 0;
+    }
     return true;
   };
 
