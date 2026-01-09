@@ -1,112 +1,207 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/BottomNav";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/common/EmptyState";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from "date-fns";
 
-const conversations = [
-  {
-    id: '1',
-    user: {
-      name: 'Alex Chen',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80',
-    },
-    item: {
-      title: 'Calculus Textbook',
-      imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=100&q=80',
-    },
-    lastMessage: 'Sounds good! See you at 2pm',
-    time: '2m ago',
-    unread: true,
-  },
-  {
-    id: '2',
-    user: {
-      name: 'Maya Patel',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80',
-    },
-    item: {
-      title: 'MacBook Charger',
-      imageUrl: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=100&q=80',
-    },
-    lastMessage: 'Is it compatible with the 2020 model?',
-    time: '1h ago',
-    unread: false,
-  },
-  {
-    id: '3',
-    user: {
-      name: 'Jordan Lee',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&q=80',
-    },
-    item: {
-      title: 'Desk Lamp',
-      imageUrl: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=100&q=80',
-    },
-    lastMessage: 'What would you want in exchange?',
-    time: 'Yesterday',
-    unread: false,
-  },
-];
+interface ChatPreview {
+  id: string;
+  item: {
+    id: string;
+    title: string;
+    image_url: string | null;
+  };
+  otherUser: {
+    id: string;
+    email: string;
+    avatar_url: string | null;
+  };
+  lastMessage?: {
+    content: string;
+    created_at: string;
+    sender_id: string;
+  };
+  unreadCount: number;
+}
 
 export default function Messages() {
   const navigate = useNavigate();
+  const [chats, setChats] = useState<ChatPreview[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate('/auth');
+          return;
+        }
+        setCurrentUserId(user.id);
+
+        // Fetch chats where user is buyer or seller
+        const { data: chatsData, error: chatsError } = await supabase
+          .from('chats')
+          .select(`
+            id,
+            buyer_id,
+            seller_id,
+            item:items!chats_item_id_fkey (
+              id,
+              title,
+              image_url
+            ),
+            buyer:profiles!chats_buyer_id_fkey (
+              id,
+              email,
+              avatar_url
+            ),
+            seller:profiles!chats_seller_id_fkey (
+              id,
+              email,
+              avatar_url
+            )
+          `)
+          .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+          .order('last_message_at', { ascending: false });
+
+        if (chatsError) throw chatsError;
+
+        // Fetch latest message for each chat
+        const chatPreviews: ChatPreview[] = await Promise.all(
+          (chatsData || []).map(async (chat: any) => {
+            const { data: messages } = await supabase
+              .from('messages')
+              .select('content, created_at, sender_id')
+              .eq('chat_id', chat.id)
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            const otherUser = chat.buyer_id === user.id ? chat.seller : chat.buyer;
+            
+            return {
+              id: chat.id,
+              item: chat.item,
+              otherUser,
+              lastMessage: messages?.[0],
+              unreadCount: 0, // TODO: Implement unread count
+            };
+          })
+        );
+
+        setChats(chatPreviews);
+      } catch (error) {
+        console.error('Error fetching chats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChats();
+  }, [navigate]);
+
+  const formatTime = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return '';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="sticky top-0 z-30 glass-strong border-b border-border"
-      >
-        <div className="container py-4">
-          <h1 className="text-2xl font-bold text-foreground">Messages</h1>
-          <p className="text-sm text-muted-foreground">Your conversations</p>
-        </div>
-      </motion.header>
+      <PageHeader 
+        title="Messages" 
+        subtitle="Your conversations"
+        showBack={false}
+      />
 
-      {/* Conversations List */}
       <div className="container py-4">
-        {conversations.map((convo, index) => (
-          <motion.button
-            key={convo.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => navigate(`/chat/${convo.id}`)}
-            className="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-secondary/50 transition-colors text-left mb-2"
-          >
-            <div className="relative">
-              <img
-                src={convo.user.avatar}
-                alt={convo.user.name}
-                className="h-14 w-14 rounded-full object-cover"
-              />
-              <img
-                src={convo.item.imageUrl}
-                alt={convo.item.title}
-                className="absolute -bottom-1 -right-1 h-7 w-7 rounded-lg object-cover border-2 border-background"
-              />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">{convo.user.name}</h3>
-                <span className="text-xs text-muted-foreground">{convo.time}</span>
+        {loading ? (
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="animate-pulse flex items-center gap-3 p-4 rounded-2xl bg-card">
+                <div className="h-14 w-14 rounded-full bg-secondary" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-secondary rounded w-1/3" />
+                  <div className="h-3 bg-secondary rounded w-2/3" />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground truncate">{convo.item.title}</p>
-              <p className={`text-sm truncate ${convo.unread ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                {convo.lastMessage}
-              </p>
-            </div>
-            
-            {convo.unread && (
-              <div className="h-3 w-3 rounded-full bg-primary flex-shrink-0" />
-            )}
-          </motion.button>
-        ))}
+            ))}
+          </div>
+        ) : chats.length > 0 ? (
+          <div className="space-y-2">
+            {chats.map((chat, index) => (
+              <motion.button
+                key={chat.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                onClick={() => navigate(`/chat/${chat.id}`)}
+                className="w-full flex items-center gap-3 p-4 rounded-2xl bg-card hover:bg-secondary/30 transition-colors text-left border border-border/50"
+              >
+                {/* Avatar with Item Thumbnail */}
+                <div className="relative flex-shrink-0">
+                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
+                    {chat.otherUser?.email?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                  {chat.item?.image_url && (
+                    <img
+                      src={chat.item.image_url}
+                      alt={chat.item.title}
+                      className="absolute -bottom-1 -right-1 h-7 w-7 rounded-lg object-cover border-2 border-background"
+                    />
+                  )}
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-foreground truncate">
+                      {chat.otherUser?.email?.split('@')[0] || 'Unknown'}
+                    </h3>
+                    {chat.lastMessage && (
+                      <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                        {formatTime(chat.lastMessage.created_at)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {chat.item?.title || 'Item'}
+                  </p>
+                  {chat.lastMessage && (
+                    <p className="text-sm text-muted-foreground truncate">
+                      {chat.lastMessage.sender_id === currentUserId ? 'You: ' : ''}
+                      {chat.lastMessage.content}
+                    </p>
+                  )}
+                </div>
+                
+                {/* Unread indicator */}
+                {chat.unreadCount > 0 && (
+                  <div className="h-5 min-w-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-medium text-primary-foreground">{chat.unreadCount}</span>
+                  </div>
+                )}
+              </motion.button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={MessageSquare}
+            title="No messages yet"
+            description="Start a conversation by messaging a seller on any item you're interested in."
+            actionLabel="Browse Items"
+            onAction={() => navigate('/home')}
+          />
+        )}
       </div>
 
       <BottomNav />
